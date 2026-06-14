@@ -30,6 +30,10 @@
          doors). Works in any save, Bandits or not.
        * "Forge key for this vehicle" - on any car you don't already have a key
          for. Creates a matching Base.CarKey. Works in any save.
+       * "Scrub all blood from this house" - while standing in any building.
+         Wipes blood + grime from every tile of the building (square:removeBlood /
+         removeGrime, the same calls the vanilla mop uses). Free, instant,
+         repeatable after a fight. Works in any save.
 
      Single client file, no overrides - it only listens to the context-menu event.
      ========================================================================== ]]
@@ -67,8 +71,9 @@ local function stampDoor(door, keyId)
     for i = 1, #garage do garage[i]:setKeyId(keyId) end
 end
 
--- stamp every door inside a building to keyId so one key works on all of them
-local function stampBuildingDoors(building, keyId)
+-- run fn(square) for every loaded square of a building, across all its z-levels.
+-- bounds are expanded by 1 so edge-mounted walls/doors are included.
+local function forEachBuildingSquare(building, fn)
     local def = building:getDef()
     local cell = getCell()
 
@@ -79,7 +84,6 @@ local function stampBuildingDoors(building, keyId)
         zLevels[rooms:get(i):getZ()] = true
     end
 
-    -- expand the bounds by 1 so edge-mounted doors are included
     local x1, y1 = def:getX() - 1, def:getY() - 1
     local x2, y2 = def:getX2() + 1, def:getY2() + 1
 
@@ -87,18 +91,36 @@ local function stampBuildingDoors(building, keyId)
         for x = x1, x2 do
             for y = y1, y2 do
                 local sq = cell:getGridSquare(x, y, z)
-                if sq then
-                    local objects = sq:getObjects()
-                    for i = 0, objects:size() - 1 do
-                        local o = objects:get(i)
-                        if isDoorObject(o) then
-                            stampDoor(o, keyId)
-                        end
-                    end
-                end
+                if sq then fn(sq) end
             end
         end
     end
+end
+
+-- stamp every door inside a building to keyId so one key works on all of them
+local function stampBuildingDoors(building, keyId)
+    forEachBuildingSquare(building, function(sq)
+        local objects = sq:getObjects()
+        for i = 0, objects:size() - 1 do
+            local o = objects:get(i)
+            if isDoorObject(o) then
+                stampDoor(o, keyId)
+            end
+        end
+    end)
+end
+
+-- scrub blood (and grime) from every square of a building; returns tiles cleaned
+local function cleanBuildingBlood(building)
+    local cleaned = 0
+    forEachBuildingSquare(building, function(sq)
+        if sq:haveStains() then
+            sq:removeBlood(false, false)
+            sq:removeGrime()
+            cleaned = cleaned + 1
+        end
+    end)
+    return cleaned
 end
 
 -- ----------------------------------------------------------------------------
@@ -161,6 +183,15 @@ function BWOHomestead.onClaimHome(worldobjects, playerObj, building)
     playerObj:Say("This is my home now.")
 end
 
+function BWOHomestead.onCleanBlood(worldobjects, playerObj, building)
+    local cleaned = cleanBuildingBlood(building)
+    if cleaned > 0 then
+        playerObj:Say("There - good as new.")
+    else
+        playerObj:Say("Nothing to clean in here.")
+    end
+end
+
 -- ----------------------------------------------------------------------------
 -- context menu
 -- ----------------------------------------------------------------------------
@@ -188,13 +219,20 @@ function BWOHomestead.OnFillWorldObjectContextMenu(playerNum, context, worldobje
             worldobjects, BWOHomestead.onForgeVehicleKey, playerObj, vehicle)
     end
 
-    -- HOME: claim the building we're standing in (Bandits Week One only)
+    -- BUILDING: options for the building we're standing in
     local building = playerObj:getBuilding()
-    if building and getActivatedMods():contains("BanditsWeekOne") then
-        local alreadyHome = BWOBuildings and BWOBuildings.IsEventBuilding(building, "home")
-        if not alreadyHome then
-            context:addOption("Claim this house as home",
-                worldobjects, BWOHomestead.onClaimHome, playerObj, building)
+    if building then
+        -- scrub blood - works in any save, any building
+        context:addOption("Scrub all blood from this house",
+            worldobjects, BWOHomestead.onCleanBlood, playerObj, building)
+
+        -- claim as home - Bandits Week One only, and only if not already home
+        if getActivatedMods():contains("BanditsWeekOne") then
+            local alreadyHome = BWOBuildings and BWOBuildings.IsEventBuilding(building, "home")
+            if not alreadyHome then
+                context:addOption("Claim this house as home",
+                    worldobjects, BWOHomestead.onClaimHome, playerObj, building)
+            end
         end
     end
 end

@@ -26,6 +26,7 @@ All via the right-click world menu — no debug mode required:
   Both registrations are fully save-compatible (they just call the base mods' own commands).
 - **Forge key for this door** — on any door you don't already have a key for. Mirrors the vanilla debug `getDoorKey` logic (handles double and garage doors). Works in any save.
 - **Forge key for this vehicle** — on any car you don't already have a key for. Creates a matching `Base.CarKey`. Works in any save.
+- **Scrub all blood from this house** — while standing in any building. Wipes blood and grime from every tile of the building (`square:removeBlood` / `removeGrime`, the same calls the vanilla mop uses) — no bucket, bleach, or mopping required. Repeatable after a fight. Works in any save.
 
 Key-forging is intentionally **free and instant** — it's there to unstick a keyless spawn, not to be a balanced crafting recipe.
 
