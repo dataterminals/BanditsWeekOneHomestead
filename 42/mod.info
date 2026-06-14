@@ -1,0 +1,4 @@
+name=Bandits Week One - Homestead
+id=BanditsWeekOneHomestead
+description=Spawned keyless? Right-click while standing inside a house and pick "Claim this house as home": it registers the building as your Bandits Week One home (so NPC "inhabitants" stop moving in), stamps the building's doors to a single key, and hands you that Home Key. Also adds "Forge key for this door" on any door and "Forge key for this vehicle" on any car, for when you spawn without keys. The home option only appears when Bandits Week One is loaded; the door/vehicle key options work in any save. Safe to remove.
+modversion=0.1.0
