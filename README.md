@@ -6,16 +6,24 @@ A small standalone add-on for **Project Zomboid (Build 42)** that fixes the *"I 
 
 ## Why a locked door isn't enough
 
-Week One's "inhabitant" NPCs are **teleported onto a free tile inside a room** by `BWOPopControl.InhabitantsSpawn` — they never walk in through the door, so locking it does nothing. The **only** building the spawner skips is the one flagged as your **home** (`BWOBuildings.IsEventBuilding(building, "home")`). That flag is normally set once, for your starting building, by `BWOEvents.Start` (which also gives you a "Home Key"). If NPCs are colonising the house you're standing in, it simply was never flagged as home.
+Week One's "inhabitant" NPCs are **teleported onto a free tile inside a room** by `BWOPopControl.InhabitantsSpawn` — they never walk in through the door, so locking it does nothing. Keeping a building NPC-free actually takes **two** registrations the base mods normally set up separately:
+
+1. **The "home" flag** (`BWOBuildings.IsEventBuilding(building, "home")`) — the spawner *skips* home buildings, so no fresh NPCs spawn inside. Normally set once, for your starting building, by `BWOEvents.Start` (which also hands you a "Home Key").
+2. **A player base** (core Bandits `gmd.Bases`) — an inhabitant that *wanders* in through a window or from an adjacent unit checks `BanditPlayerBase.GetBase` and **flees** if it's inside one (`ZPInhabitant.Main`). A base is normally created only the **first time you put something in a fridge/freezer** (`BanditActionInterceptor`).
+
+A fresh, keyless, unstocked spawn usually has **neither**, which is why NPCs colonise it even after you "claim" it. This mod sets both at once.
 
 ## What it adds
 
 All via the right-click world menu — no debug mode required:
 
 - **Claim this house as home** — appears while you're standing inside a building, with Bandits Week One loaded. It:
-  1. Registers the building as your `home` using Week One's own `EventBuildingAdd` command (fully save-compatible) → **NPCs stop moving in**.
-  2. Stamps every door in the building to the building's key id, so one key works on all of them.
-  3. Hands you that key, named **Home Key**.
+  1. Registers the building as your `home` (Week One's `EventBuildingAdd`) → **no new NPCs spawn inside**.
+  2. Registers the building as your **base** (core Bandits' `BaseUpdate`, same as stocking a fridge) → **inhabitants that wander in flee**, and any already inside leave on their next tick.
+  3. Stamps every door in the building to the building's key id, so one key works on all of them.
+  4. Hands you that key, named **Home Key**.
+
+  Both registrations are fully save-compatible (they just call the base mods' own commands).
 - **Forge key for this door** — on any door you don't already have a key for. Mirrors the vanilla debug `getDoorKey` logic (handles double and garage doors). Works in any save.
 - **Forge key for this vehicle** — on any car you don't already have a key for. Creates a matching `Base.CarKey`. Works in any save.
 

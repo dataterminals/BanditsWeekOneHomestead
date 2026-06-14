@@ -4,20 +4,27 @@
      Solves the "I spawned inside a house with no key, and Bandits NPCs move in
      the moment I leave" problem.
 
-     WHY A KEY ALONE DOES NOTHING:
+     WHY A KEY ALONE DOES NOTHING - and the TWO protections you actually need:
        Week One's inhabitant spawner (BWOPopControl.InhabitantsSpawn) teleports
        NPCs straight onto a free tile inside a room - they never path through the
-       door, so a locked door is irrelevant. The ONLY building it skips is the one
-       flagged as your "home" (BWOPopControl.lua: `IsEventBuilding(building,"home")`).
-       That flag is normally set once, for your starting building, by
-       BWOEvents.Start - which also gives you a "Home Key".
+       door, so a locked door is irrelevant. Keeping a building NPC-free needs two
+       separate registrations that the base mods set up independently:
+         1. The "home" flag (gmd.EventBuildings[keyId].event=="home") - the spawner
+            SKIPS home buildings, so no fresh NPCs spawn inside. Set at game start
+            for your start building by BWOEvents.Start (with a free Home Key).
+         2. A player BASE rectangle (core Bandits gmd.Bases) - an inhabitant that
+            WANDERS in (window, adjacent unit) checks BanditPlayerBase.GetBase and
+            FLEES if inside one (ZPInhabitant.Main). A base is normally created
+            only the first time you put something in a fridge/freezer
+            (BanditActionInterceptor) - so a fresh, unstocked spawn has none.
+       A keyless spawn typically has neither, which is why NPCs colonise it.
 
      WHAT THIS MOD ADDS (all via the right-click world menu, no debug mode):
        * "Claim this house as home"  - only while standing in a building and only
-         when Bandits Week One is loaded. Sends Week One's own EventBuildingAdd
-         command with event="home" (so it's fully save-compatible), stamps every
-         door in the building to the building's key id, and gives you that key
-         named "Home Key". This is the part that actually stops the move-ins.
+         when Bandits Week One is loaded. Sets BOTH protections for the building:
+         Week One's EventBuildingAdd event="home" (stops spawns) AND core Bandits'
+         BaseUpdate (makes wanderers flee), both save-compatible. Also stamps every
+         door to the building's key id and gives you that key named "Home Key".
        * "Forge key for this door"    - on any door you don't already have a key
          for. Mirrors the vanilla debug getDoorKey logic (handles double / garage
          doors). Works in any save, Bandits or not.
@@ -132,10 +139,23 @@ function BWOHomestead.onClaimHome(worldobjects, playerObj, building)
     }
     sendClientCommand(playerObj, "Commands", "EventBuildingAdd", args)
 
-    -- 2) make the building's doors all answer to one key
+    -- 2) register the building as our base (the core Bandits command, same as
+    --    stocking a fridge does via BanditActionInterceptor). This is what makes
+    --    any inhabitant that WANDERS in - through a window or from an adjacent
+    --    unit - flee the building (ZPInhabitant.Main: GetBase -> Run). The home
+    --    flag above only stops fresh spawns; this evicts the wanderers.
+    local baseArgs = {
+        x = def:getX(),
+        y = def:getY(),
+        x2 = def:getX2(),
+        y2 = def:getY2(),
+    }
+    sendClientCommand(playerObj, "Commands", "BaseUpdate", baseArgs)
+
+    -- 3) make the building's doors all answer to one key
     stampBuildingDoors(building, keyId)
 
-    -- 3) hand over that key
+    -- 4) hand over that key
     giveKey(playerObj, "Base.Key1", keyId, "Home Key")
 
     playerObj:Say("This is my home now.")
